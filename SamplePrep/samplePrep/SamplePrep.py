@@ -14,6 +14,8 @@ from motorControl import dmcCommand
 from motorControl import initMotor
 from motorControl import resetMotor
 from motorControl import spinMotor
+from motorControl import moveMotor
+from motorControl import finalMove
 #pressure controller functions
 import time
 from Fluigent.SDK import fgt_init, fgt_close
@@ -22,6 +24,11 @@ from Fluigent.SDK import fgt_set_pressure, fgt_get_pressure, fgt_get_pressureRan
 from MCP3008 import MCP3008
 adc = MCP3008()
 resistance = 0
+global delay  
+delay = 100
+
+initMotor()
+
 
 #this function reads the adc for temperature and modifies the global variable 
 
@@ -161,18 +168,19 @@ class TemperatureScreen(Screen):
                 app = App.get_running_app()
                 app.root.current = 'homescreen'
         def updateTemperature(self,dt) : 
-                adc = MCP3008()
-                #R1 est a spécifié ici
-                R1 = 965
-                
-                valeur = adc.read( channel = 0 ) # Vous pouvez bien entendu adapter le canal à lire
-                valeur = valeur / 1023.0 * 3.3
-                gain = valeur/3.3
-                print("\nTension appliquée : %.2f" % (valeur) )
-                print("par consequent, la résistance est d'environ : %.3f" %((gain*R1)/(1-gain)))
-                global resistance
-                resistance = ((gain*R1)/(1-gain))
-                self.ids["temperature"].text = str(resistance)
+                app = App.get_running_app()
+                if app.root.current == 'temperature':
+                        adc = MCP3008()
+                        #R1 est a spécifié ici
+                        R1 = 100.4                       
+                        valeur = adc.read( channel = 0 ) # Vous pouvez bien entendu adapter le canal à lire
+                        valeur = valeur / 1023.0 * 3.3
+                        gain = valeur/3.3
+                        print("\nTension appliquée : %.2f" % (valeur) )
+                        print("par consequent, la résistance est d'environ : %.3f" %((gain*R1)/(1-gain)))
+                        global resistance
+                        resistance = ((gain*R1)/(1-gain))
+                        self.ids["temperature"].text = str(resistance)
 
 class SprayScreen(Screen):
         def __init__(self, **kwargs):
@@ -189,8 +197,8 @@ class SprayScreen(Screen):
 
                 #sub-layout that contains buttons used motor placement
                 motorLayout = GridLayout(cols=2)
-                button3 = Button(text="-")
-                button4 = Button(text="+")
+                button3 = Button(text="-",on_release = self.motorPlacementF )
+                button4 = Button(text="+",on_release = self.motorPlacementB )
 
                 motorLayout.add_widget(button3)
                 motorLayout.add_widget(button4)
@@ -207,54 +215,105 @@ class SprayScreen(Screen):
 
                 #add global layout to the screen
                 self.add_widget(layout)
+                
+                
+                Clock.schedule_interval(self.updatePressure,0.5)
+                
 
         #called when the debug button is pressed    
         def tolaunch(self, *args):
+                fgt_set_pressure(1,0)
+                fgt_set_pressure(0,0)
                 app = App.get_running_app()
                 app.root.current = 'launch'
         def toTemperature(self, *args):
+                fgt_set_pressure(1,0)
+                fgt_set_pressure(0,0)
                 app = App.get_running_app()
                 app.root.current = 'temperature'
+        def motorPlacementF(self,*args):
+                moveMotor(1)
+        def motorPlacementB(self,*args):
+                moveMotor(-1)
+        def updatePressure(self,*args):
+                app = App.get_running_app()
+                if app.root.current == 'spray':
+                        fgt_set_pressure(1,1000)
+                        fgt_set_pressure(0,1000)
+
+
+                
+                
 
                 
 class LaunchScreen(Screen):
         def __init__(self, **kwargs):
                 super(LaunchScreen, self).__init__(**kwargs)
                 layout = GridLayout(rows = 4,padding = 75)
+                
 
                 #sub-layout that contains buttons used for navigation
                 buttonLayout = GridLayout(cols=2,spacing = 500,size_hint = (1,0.5))
                 button1 = Button(text="spray", on_release=self.toSpray)
-                button2 = Label()
+                button2 = Button(text="launch", on_release=self.launch)
+                
 
                 buttonLayout.add_widget(button1)
                 buttonLayout.add_widget(button2)
 
                 #sub-layout that contains buttons used for delay control
-                delayLayout = GridLayout(cols=2)
-                button3 = Button(text="-")
-                button4 = Button(text="+")
+                delayLayout = GridLayout(cols=4)
+                button3 = Button(text="-",on_release= self.delayMinus)
+                button4 = Button(text="+",on_release= self.delayPlus)
+                button5 = Button(text="- -",on_release= self.delayMinusMinus)
+                button6 = Button(text="++",on_release= self.delayPlusPlus)
 
+                delayLayout.add_widget(button5)
                 delayLayout.add_widget(button3)
                 delayLayout.add_widget(button4)
+                delayLayout.add_widget(button6)
 
                 #labels
-                title = Label(text='replace the used grid with a new one')
-                text = Label(text = "input to desired delay and press launch.")                
+                title = Label(text='replace the used grid with a new one\ninput to desired delay and press launch.')
+                delayLabel = Label(text = "100 ms")     
+                self.ids["delayLabel"] = delayLabel           
                 
                 #add every sub-layout to the global layout
                 layout.add_widget(title)
-                layout.add_widget(text)
+                layout.add_widget(delayLabel)
                 layout.add_widget(delayLayout)
                 layout.add_widget(buttonLayout)
 
                 #add global layout to the screen
                 self.add_widget(layout)
+                #Clock.schedule_interval(self.updateSpeed,0.5)
 
         #called when the debug button is pressed    
         def toSpray(self, *args):
                 app = App.get_running_app()
                 app.root.current = 'spray'
+        def launch(self, *args):
+                fgt_set_pressure(1,1000)
+                fgt_set_pressure(0,1000)
+                time.sleep(delay*0.001)
+                finalMove()
+        def delayPlus(self, *args) : 
+                global delay
+                delay = delay + 10
+                self.ids["delayLabel"].text = str(delay) + ' ms'
+        def delayPlusPlus(self, *args) : 
+                global delay
+                delay = delay + 100
+                self.ids["delayLabel"].text = str(delay) + ' ms'
+        def delayMinus(self, *args) : 
+                global delay
+                delay = delay - 10
+                self.ids["delayLabel"].text = str(delay) + ' ms'
+        def delayMinusMinus(self, *args) : 
+                global delay
+                delay = delay - 100
+                self.ids["delayLabel"].text = str(delay) + ' ms'
+        
 
                 
 

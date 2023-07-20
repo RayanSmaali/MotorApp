@@ -24,17 +24,28 @@ def initMotor():
 	dmcCommand("SH")
 	
 	
-	#programs a relative movement (PR : Position Relative)
-	#it will be done at the desired speed (SP)
+	#programs an movement (PR : Position absolute)
+	#it will be done at the desired speed (SP) and acceleration (AC)
 	dmcCommand("SP4000")
-	dmcCommand("PR4000")
+	#dmcCommand("AC20000")
+	dmcCommand("PA-1000")
+	dmcCommand("BGA")
 	print(g.GInfo())
 
 #called when pressing the spin button
 #begins the movement that was pre-programmed
 def spinMotor(sens):		
-		
+	
 	dmcCommand("PR" + str(4000*sens))
+	dmcCommand("AMA")
+	dmcCommand("BGA")
+def moveMotor(sens):
+	dmcCommand("PR" + str(25*sens))
+	dmcCommand("AMA")
+	dmcCommand("BGA")
+def finalMove():
+	dmcCommand("SP9999")
+	dmcCommand("PA" + str(-2000))
 	dmcCommand("AMA")
 	dmcCommand("BGA")
 
